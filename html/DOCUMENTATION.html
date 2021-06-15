@@ -1,0 +1,91 @@
+<h2>General</h2>
+
+<p>This project is written in JS and HTML and can simply be self-hosted via static files, no dynamic backend required.</p>
+
+<p>This project uses <strong>npm</strong> and <strong>webpack</strong> to organize dependencies while development and bundle all application sources for final deployment.</p>
+
+<p>For the visualization <strong>d3js</strong> is used and <strong>Vue.js</strong> is used as a javascript frontend framework to connect the data, dynamic configuration and reactive visualization.</p>
+
+<h2>Files</h2>
+
+<h3>Pre Processing</h3>
+
+<p>The pre-processing of the data was done via a Jupyter Notebook and uses the &ldquo;All English&rdquo; HistWords embeddings dataset created by Hamilton et al.
+The files can be found hosted by the paper authors: https://pages.cs.wisc.edu/~heimerl/hamilton_embeddings.tar.bz2 (<strong>this link got recently removed!</strong>)</p>
+
+<p>Datasets need to be placed into <em>PreProcessing/data/embeddings/</em>.</p>
+
+<ul>
+<li><em>PreProcessing/EmbeddingsDataProcessing.ipynb</em> - Jupyter notebook used to convert embeddings into compact float32 binary files.</li>
+<li><em>PreProcessing/data/NewGeneralServiceList+1.01+by+band.csv</em> - Most common words selection file based on http://www.newgeneralservicelist.org/.</li>
+</ul>
+
+
+<h3>Project</h3>
+
+<p>The following files contain the implementation core of this project.</p>
+
+<ul>
+<li><em>Project/src/App.vue</em> - Main program entry point</li>
+<li><em>Project/src/ui/NeighborhoodGraphView.vue</em> - UI with visualization of the NeighborhoodData using d3js.</li>
+<li><p><em>Project/src/ui/NeighborhoodSettingsView.vue</em> - UI for dynamic view and dataset settings.</p></li>
+<li><p><em>Project/src/data/dataset.js</em> - Processing of the raw embedding matrices to find nearest neighbors of a term / vector, storing the results in NeighborhoodData.</p></li>
+<li><em>Project/src/data/dataset.async.js</em> - Async implementations of DataProcessor and Dataset which communicate with a web worker to do the actual processing.</li>
+<li><em>Project/src/data/dataset.worker.js</em> - Web worker implementation allowing the processing of the data in a separate background thread based on messages from UI thread.</li>
+</ul>
+
+
+<h2>Concept</h2>
+
+<h3>Data Processing</h3>
+
+<p><strong>The original dataset has a combined size of 1.7GB of data</strong> for the corpus from 1800 to 1990. The terms used in 1800 are only 32MB whereas the words used in 1990 are 162Mb. The data also contains any kind of word and all its variations found in the analyzed text corpus.</p>
+
+<p>Our approach was to only use a sub-selection of words and try to store the embedding matrices in the most compact way, so it can be hosted and served to the user directly. This allows to avoid having a (slow) backend doing the processing on large parts of unnecessary data. However, it also means compromises must be made as we have to pre-select the availble terms.</p>
+
+<p>For a selection of words we used the New General Service List containing 2800 words. For all these words we extracted the word vectors of the original dataset and stored them in a 2800x300 matrices of 300 32-bit float numbers. These files (together with the file containing all terms) are served as files to the web visualization. Now <strong>a dataset is only 3.2Mb</strong> in size whereas <strong>the word list is 28.4kB in size</strong>.</p>
+
+<p>Another side effect is that this smaller corpus of words only contains more popular terms used in the english language. We believe for an initial exploration this is of advantage compared to using the original dataset which also considers words only used sparely in the english language with the same importance.</p>
+
+<p>Please see the Jupyter notebook for the code which extracts all terms and organizes them in matrices.
+The DatasetCollections class in <em>dataset.js</em> contains the code to load all matrices and the wordlist from the server and organize it in multiple Dataset classes.</p>
+
+<p>To keep the UI response the data is loaded and processed in a background thread using the <a href="https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API">Web Workers API</a>.
+Communication is done via messages. Settings (including term selection) is sent to the worker, the worker holds all datasets and only sends the processed data as an instance of the NeighborhoodData class back to the UI to visualize it.</p>
+
+<h3>UI and Visualization</h3>
+
+<p><img src="vui_dataflow.png" alt="Vui.js Dataflow" /></p>
+
+<p>The <em>NeighborhoodSettingsView</em> component is used to configure the NeighborhoodSettings instance which holds the dataset and terms selection as well as multiple view settings (e.g. neighbors, color scale or quantiles). Whenever the settings are changed the d3js visualization found in <em>NeighborhoodGraphView</em> is re-rendered. In case change of settings require the re-calculation of the NeighborhoodData a rebuild on the <em>DataProcessor</em> is triggered which in turn triggers a re-render.</p>
+
+<p>Apart from the <em>NeighborhoodSettingsView</em> view also the d3js visualization in <em>NeighborhoodGraphView</em> can be used to influence the settings. For example clicking on a term selects the term. Or using the mouse-wheel will influence the zooming (and deactivate the auto zoom setting).</p>
+
+<p>All this is done using the Vue.js data binding mechanism. The vue components only render the data and settings instances, but they are created and managed at a single point (<em>App component</em>) and events can freely flow between all sub-components.</p>
+
+<p>In addition, the visualization also uses d3js build-in dynamic data bindings which avoids the recreation of the whole graph when the NeighborhoodData changes (this was one large disadvantage of the paper reference implementation which required a complete re-creation, resulting in loosing all interactive changes).</p>
+
+<p>All this allows us to build a very dynamic visualization which can be influenced from multiple sub-components. It would also be easy to add additional variation of the visualization but use the same data structures.</p>
+
+<h2>Development</h2>
+
+<p>Please make sure <strong>npm</strong> is installed on the machine. Linux is recommended.</p>
+
+<h3>Install dependencies</h3>
+
+<p><code>
+npm install
+</code></p>
+
+<h3>Run development server</h3>
+
+<p><code>
+npm run dev
+</code>
+Go to http://localhost:8080</p>
+
+<h3>Build bundles for deployment</h3>
+
+<p><code>
+npm run build
+</code></p>
